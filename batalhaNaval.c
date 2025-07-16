@@ -1,74 +1,126 @@
 #include <stdio.h>
+#include <stdlib.h>  // Necessário para abs()
 
-#define TAMANHO 10
-#define TAMANHO_NAVIO 3
+#define TAMANHO_TABULEIRO 10
+#define TAMANHO_HABILIDADE 5
 #define NAVIO 3
+#define HABILIDADE 5
 
-// Função para verificar se as posições estão livres
-int posicao_livre(int tabuleiro[TAMANHO][TAMANHO], int linha, int coluna) {
-    return tabuleiro[linha][coluna] == 0;
-}
-
-// Função para verificar se há espaço para posicionar o navio
-int pode_posicionar(int tabuleiro[TAMANHO][TAMANHO], int linha, int coluna, int direcao, char tipo) {
-    for (int i = 0; i < TAMANHO_NAVIO; i++) {
-        int l = linha, c = coluna;
-
-        if (tipo == 'H') c += i;
-        else if (tipo == 'V') l += i;
-        else if (tipo == 'D') { l += i; c += i; }      // ↘ diagonal crescente
-        else if (tipo == 'I') { l += i; c -= i; }      // ↙ diagonal inversa
-
-        if (l >= TAMANHO || c < 0 || c >= TAMANHO || !posicao_livre(tabuleiro, l, c))
-            return 0;
-    }
-    return 1;
-}
-
-// Função para posicionar navios no tabuleiro
-void posicionar_navio(int tabuleiro[TAMANHO][TAMANHO], int linha, int coluna, char tipo) {
-    for (int i = 0; i < TAMANHO_NAVIO; i++) {
-        int l = linha, c = coluna;
-
-        if (tipo == 'H') c += i;
-        else if (tipo == 'V') l += i;
-        else if (tipo == 'D') { l += i; c += i; }  // ↘
-        else if (tipo == 'I') { l += i; c -= i; }  // ↙
-
-        tabuleiro[l][c] = NAVIO;
+// Inicializa o tabuleiro com água (0)
+void inicializar_tabuleiro(int tabuleiro[TAMANHO_TABULEIRO][TAMANHO_TABULEIRO]) {
+    for (int i = 0; i < TAMANHO_TABULEIRO; i++) {
+        for (int j = 0; j < TAMANHO_TABULEIRO; j++) {
+            tabuleiro[i][j] = 0;
+        }
     }
 }
 
-// Função para exibir o tabuleiro
-void exibir_tabuleiro(int tabuleiro[TAMANHO][TAMANHO]) {
-    printf("\nTabuleiro (0 = água, 3 = navio):\n\n");
-
-    for (int i = 0; i < TAMANHO; i++) {
-        for (int j = 0; j < TAMANHO; j++) {
-            printf("%d ", tabuleiro[i][j]);
+// Exibe o tabuleiro com representação visual
+void exibir_tabuleiro(int tabuleiro[TAMANHO_TABULEIRO][TAMANHO_TABULEIRO]) {
+    printf("\nTabuleiro:\n");
+    for (int i = 0; i < TAMANHO_TABULEIRO; i++) {
+        for (int j = 0; j < TAMANHO_TABULEIRO; j++) {
+            if (tabuleiro[i][j] == 0) printf(". ");
+            else if (tabuleiro[i][j] == NAVIO) printf("N ");
+            else if (tabuleiro[i][j] == HABILIDADE) printf("* ");
+            else printf("? "); // Caso especial
         }
         printf("\n");
     }
 }
 
+// Posiciona navios simples (para visualização)
+void posicionar_navios(int tabuleiro[TAMANHO_TABULEIRO][TAMANHO_TABULEIRO]) {
+    // Navio horizontal
+    for (int i = 0; i < 3; i++)
+        tabuleiro[2][2 + i] = NAVIO;
+
+    // Navio vertical
+    for (int i = 0; i < 3; i++)
+        tabuleiro[5 + i][5] = NAVIO;
+}
+
+// Cria matriz de habilidade CONE (forma triangular para baixo)
+void criar_cone(int matriz[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE]) {
+    for (int i = 0; i < TAMANHO_HABILIDADE; i++) {
+        for (int j = 0; j < TAMANHO_HABILIDADE; j++) {
+            if (j >= (TAMANHO_HABILIDADE - 1) / 2 - i &&
+                j <= (TAMANHO_HABILIDADE - 1) / 2 + i)
+                matriz[i][j] = 1;
+            else
+                matriz[i][j] = 0;
+        }
+    }
+}
+
+// Cria matriz de habilidade CRUZ (horizontal + vertical com centro)
+void criar_cruz(int matriz[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE]) {
+    for (int i = 0; i < TAMANHO_HABILIDADE; i++) {
+        for (int j = 0; j < TAMANHO_HABILIDADE; j++) {
+            if (i == TAMANHO_HABILIDADE / 2 || j == TAMANHO_HABILIDADE / 2)
+                matriz[i][j] = 1;
+            else
+                matriz[i][j] = 0;
+        }
+    }
+}
+
+// Cria matriz de habilidade OCTAEDRO (losango)
+void criar_octaedro(int matriz[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE]) {
+    for (int i = 0; i < TAMANHO_HABILIDADE; i++) {
+        for (int j = 0; j < TAMANHO_HABILIDADE; j++) {
+            if (abs(i - TAMANHO_HABILIDADE / 2) + abs(j - TAMANHO_HABILIDADE / 2) <= TAMANHO_HABILIDADE / 2)
+                matriz[i][j] = 1;
+            else
+                matriz[i][j] = 0;
+        }
+    }
+}
+
+// Sobrepõe a matriz de habilidade no tabuleiro, com origem (lin,col)
+void aplicar_habilidade(int tabuleiro[TAMANHO_TABULEIRO][TAMANHO_TABULEIRO],
+                        int habilidade[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE],
+                        int origem_linha, int origem_coluna) {
+    int offset = TAMANHO_HABILIDADE / 2;
+
+    for (int i = 0; i < TAMANHO_HABILIDADE; i++) {
+        for (int j = 0; j < TAMANHO_HABILIDADE; j++) {
+            if (habilidade[i][j] == 1) {
+                int linha = origem_linha + i - offset;
+                int coluna = origem_coluna + j - offset;
+
+                // Verifica se está dentro dos limites do tabuleiro
+                if (linha >= 0 && linha < TAMANHO_TABULEIRO &&
+                    coluna >= 0 && coluna < TAMANHO_TABULEIRO &&
+                    tabuleiro[linha][coluna] == 0) {
+                    tabuleiro[linha][coluna] = HABILIDADE;
+                }
+            }
+        }
+    }
+}
+
 int main() {
-    // Declaração e inicialização do tabuleiro
-    int tabuleiro[TAMANHO][TAMANHO] = {0};
+    int tabuleiro[TAMANHO_TABULEIRO][TAMANHO_TABULEIRO];
+    int cone[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE];
+    int cruz[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE];
+    int octaedro[TAMANHO_HABILIDADE][TAMANHO_HABILIDADE];
 
-    // Coordenadas e direções dos 4 navios
-    // Navios retos
-    if (pode_posicionar(tabuleiro, 1, 1, 0, 'H'))  // horizontal
-        posicionar_navio(tabuleiro, 1, 1, 'H');
+    // Inicializa o tabuleiro com água
+    inicializar_tabuleiro(tabuleiro);
 
-    if (pode_posicionar(tabuleiro, 4, 2, 0, 'V'))  // vertical
-        posicionar_navio(tabuleiro, 4, 2, 'V');
+    // Posiciona navios fixos
+    posicionar_navios(tabuleiro);
 
-    // Navios diagonais
-    if (pode_posicionar(tabuleiro, 6, 6, 0, 'D'))  // diagonal ↘
-        posicionar_navio(tabuleiro, 6, 6, 'D');
+    // Cria as formas das habilidades
+    criar_cone(cone);
+    criar_cruz(cruz);
+    criar_octaedro(octaedro);
 
-    if (pode_posicionar(tabuleiro, 0, 4, 0, 'I'))  // diagonal ↙
-        posicionar_navio(tabuleiro, 0, 4, 'I');
+    // Aplica as habilidades em posições fixas no tabuleiro
+    aplicar_habilidade(tabuleiro, cone, 2, 4);      // Cone a partir da linha 2, coluna 4
+    aplicar_habilidade(tabuleiro, cruz, 5, 2);      // Cruz no centro-esquerda
+    aplicar_habilidade(tabuleiro, octaedro, 7, 7);  // Octaedro canto inferior direito
 
     // Exibe o tabuleiro final
     exibir_tabuleiro(tabuleiro);
